@@ -52,24 +52,27 @@ class Buffer:
         self._check_scroll()
 
     def delete_char(self):
-        # Mark buffer as dirty since its changing it
-        self.dirty = True
         # If there is a selection, delete it
         if self.has_selection():
             self.delete_selection()
             return
         # If cursor x is greater than 0, delete char before cursor and move left
         if self.cx > 0:
+            self.dirty = True
             line = self.get_line()
             self.lines[self.cy] = line[:self.cx - 1] + line[self.cx:]
             self.cx -= 1
         elif self.cy > 0:
             # Merge current line with previous
+            self.dirty = True
             prev_len = len(self.lines[self.cy - 1])
             current_line = self.lines.pop(self.cy)
             self.lines[self.cy - 1] += current_line
             self.cy -= 1
             self.cx = prev_len
+        else:
+            # No-op: cursor is at the very start of the buffer
+            return
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
         self._check_scroll()
@@ -152,6 +155,7 @@ class Buffer:
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
         self.clear_selection()
+        self._check_scroll()
     
     def _check_scroll(self):
         # Vertical scrolling: If cursor moved above the top of the screen

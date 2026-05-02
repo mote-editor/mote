@@ -164,6 +164,18 @@ class TestTextDeletion:
         buf.delete_char()
         assert buf.dirty is True
 
+    def test_delete_char_at_buffer_start_is_noop(self):
+        """Test that delete_char at the very start of the buffer is a no-op and does not dirty"""
+        buf = Buffer("hello")
+        buf.cx = 0
+        buf.cy = 0
+        assert buf.dirty is False
+        buf.delete_char()
+        assert buf.lines == ["hello"]
+        assert buf.cx == 0
+        assert buf.cy == 0
+        assert buf.dirty is False
+
     def test_delete_with_selection_deletes_selection(self):
         """Test deleting with selection removes the selection"""
         buf = Buffer("hello")
