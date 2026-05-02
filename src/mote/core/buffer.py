@@ -1,6 +1,6 @@
 class Buffer:
     # Init func, takes text arg for loading text, defaults to empty string for new buffer
-    def __init__(self, text=""):
+    def __init__(self, text="", screen_height=24):
         # Store text as lots of lines, split by newlines if text is given in the args
         self.lines = text.splitlines() if text else [""]
         # Cursor x and y positions
@@ -13,7 +13,13 @@ class Buffer:
         self.select_y = None
         # Check if the buffer has unsaved changes
         self.dirty = False
+        # Screen height for calculating visible lines and scrolling
+        self.screen_height = screen_height
     
+    def resize_screen(self, new_height):
+        self.screen_height = new_height
+        self._check_scroll()
+
     # Get line func, takes index arg for which line to get, defaults to current cursor y position
     def get_line(self, index=None):
         # Set the index to given, or cursor y if not given
@@ -136,12 +142,22 @@ class Buffer:
         self._effective_cx = self.cx
         self.clear_selection()
     
+    def _check_scroll(self):
+        # If cursor moved above the top of the screen
+        if self.cy < self.row_off:
+            self.row_off = self.cy
+        
+        # If cursor moved below the bottom of the screen
+        elif self.cy >= self.row_off + self.screen_height:
+            self.row_off = self.cy - self.screen_height + 1
+
     # Move cursor up one line, using effective cursor position
     def move_up(self):
         if self.cy > 0:
             self.cy -= 1
             # Set cursor x to effective cursor position, clamped to line length
             self.cx = min(self._effective_cx, len(self.lines[self.cy]))
+            self._check_scroll()
     
     # Move cursor down one line, using effective cursor position
     def move_down(self):
@@ -149,6 +165,7 @@ class Buffer:
             self.cy += 1
             # Set cursor x to effective cursor position, clamped to line length
             self.cx = min(self._effective_cx, len(self.lines[self.cy]))
+            self._check_scroll()
     
     # Move cursor left, resetting effective cursor
     def move_left(self):
@@ -174,3 +191,15 @@ class Buffer:
     # Get full text func, returns the full text of the buffer by joining all lines with newlines
     def get_full_text(self):
         return "\n".join(self.lines)
+    
+    # Get visible range func, takes screen_height to determine which lines are visible based on the current row offset, returns (start, end) line indices
+    def get_visible_range(self, screen_height):
+        start = self.row_off
+        # Don't try to show more lines than the buffer actually has
+        end = min(len(self.lines), self.row_off + screen_height)
+        return start, end
+    
+    # Get visible lines func, takes screen_height to determine which lines to return for rendering
+    def get_visible_lines(self, screen_height):
+        start, end = self.get_visible_range(screen_height)
+        return self.lines[start:end]
