@@ -1,0 +1,176 @@
+class Buffer:
+    # Init func, takes text arg for loading text, defaults to empty string for new buffer
+    def __init__(self, text=""):
+        # Store text as lots of lines, split by newlines if text is given in the args
+        self.lines = text.splitlines() if text else [""]
+        # Cursor x and y positions
+        self.cx = 0
+        self.cy = 0
+        # Effective cursor x position - tracks desired column when moving vertically
+        self._effective_cx = 0
+        # Selection starting coords
+        self.select_x = None
+        self.select_y = None
+        # Check if the buffer has unsaved changes
+        self.dirty = False
+    
+    # Get line func, takes index arg for which line to get, defaults to current cursor y position
+    def get_line(self, index=None):
+        # Set the index to given, or cursor y if not given
+        idx = index if index is not None else self.cy
+        return self.lines[idx]
+
+    # Insert char func, takes char arg for which character to insert at the cursor position
+    def insert_char(self, char):
+        # Mark buffer as dirty since its changing it
+        self.dirty = True
+        # If there is a selection, delete it first and replace with char
+        if self.has_selection():
+            self.delete_selection()
+        # Get the current line
+        line = self.get_line()
+        # Insert char at x position in the line in the buffer
+        self.lines[self.cy] = line[:self.cx] + char + line[self.cx:]
+        # Move the cursor right by 1
+        self.cx += 1
+        # Reset effective cursor to actual cursor position
+        self._effective_cx = self.cx
+
+    def delete_char(self):
+        # Mark buffer as dirty since its changing it
+        self.dirty = True
+        # If there is a selection, delete it
+        if self.has_selection():
+            self.delete_selection()
+            return
+        # If cursor x is greater than 0, delete char before cursor and move left
+        if self.cx > 0:
+            line = self.get_line()
+            self.lines[self.cy] = line[:self.cx - 1] + line[self.cx:]
+            self.cx -= 1
+        elif self.cy > 0:
+            # Merge current line with previous
+            prev_len = len(self.lines[self.cy - 1])
+            current_line = self.lines.pop(self.cy)
+            self.lines[self.cy - 1] += current_line
+            self.cy -= 1
+            self.cx = prev_len
+        # Reset effective cursor to actual cursor position
+        self._effective_cx = self.cx
+
+    # Split line func, splits the current line at the cursor position into two lines
+    def split_line(self):
+        # Mark buffer as dirty since its changing it
+        self.dirty = True
+        # If there is a selection, delete it first
+        if self.has_selection():
+            self.delete_selection()
+        # Get the current line
+        line = self.get_line()
+        # Split the line at the cursor x position, keep the left part in the current line and insert the right part as a new line below
+        self.lines[self.cy] = line[:self.cx]
+        # Insert the right part as a new line below the current line
+        self.lines.insert(self.cy + 1, line[self.cx:])
+        # Move the cursor down to the new line and reset x to 0
+        self.cy += 1
+        self.cx = 0
+        # Reset effective cursor to actual cursor position
+        self._effective_cx = self.cx
+
+    # Start selection func, sets the selection starting coordinates to the current cursor position
+    def start_selection(self):
+        self.select_x = self.cx
+        self.select_y = self.cy
+    
+    # Clear selection func, clears the selection starting coordinates
+    def clear_selection(self):
+        self.select_x = None
+        self.select_y = None
+    
+    # Check if there is an active selection
+    def has_selection(self):
+        return self.select_x is not None and self.select_y is not None
+    
+    # Get selection bounds, returns (start_y, start_x, end_y, end_x) sorted from start to end
+    def get_selection_bounds(self):
+        if not self.has_selection():
+            return None
+        
+        start_y, start_x = self.select_y, self.select_x
+        end_y, end_x = self.cy, self.cx
+        
+        # Sort so start is always before end
+        if start_y > end_y or (start_y == end_y and start_x > end_x):
+            start_y, start_x, end_y, end_x = end_y, end_x, start_y, start_x
+        
+        return (start_y, start_x, end_y, end_x)
+    
+    # Delete text within selection bounds
+    def delete_selection(self):
+        bounds = self.get_selection_bounds()
+        if not bounds:
+            return
+        
+        self.dirty = True
+        start_y, start_x, end_y, end_x = bounds
+        
+        if start_y == end_y:
+            # Single line selection - just remove the text
+            line = self.lines[start_y]
+            self.lines[start_y] = line[:start_x] + line[end_x:]
+        else:
+            # Multi-line selection
+            # Keep the part before selection on start line
+            start_line = self.lines[start_y][:start_x]
+            # Keep the part after selection on end line
+            end_line = self.lines[end_y][end_x:]
+            # Merge them
+            self.lines[start_y] = start_line + end_line
+            # Delete the lines in between
+            del self.lines[start_y + 1:end_y + 1]
+        
+        # Move cursor to start of selection and clear selection
+        self.cy = start_y
+        self.cx = start_x
+        # Reset effective cursor to actual cursor position
+        self._effective_cx = self.cx
+        self.clear_selection()
+    
+    # Move cursor up one line, using effective cursor position
+    def move_up(self):
+        if self.cy > 0:
+            self.cy -= 1
+            # Set cursor x to effective cursor position, clamped to line length
+            self.cx = min(self._effective_cx, len(self.lines[self.cy]))
+    
+    # Move cursor down one line, using effective cursor position
+    def move_down(self):
+        if self.cy < len(self.lines) - 1:
+            self.cy += 1
+            # Set cursor x to effective cursor position, clamped to line length
+            self.cx = min(self._effective_cx, len(self.lines[self.cy]))
+    
+    # Move cursor left, resetting effective cursor
+    def move_left(self):
+        if self.cx > 0:
+            self.cx -= 1
+            self._effective_cx = self.cx
+        elif self.cy > 0:
+            self.cy -= 1
+            self.cx = len(self.lines[self.cy])
+            self._effective_cx = self.cx
+    
+    # Move cursor right, resetting effective cursor
+    def move_right(self):
+        line = self.get_line()
+        if self.cx < len(line):
+            self.cx += 1
+            self._effective_cx = self.cx
+        elif self.cy < len(self.lines) - 1:
+            self.cy += 1
+            self.cx = 0
+            self._effective_cx = self.cx
+
+    # Get full text func, returns the full text of the buffer by joining all lines with newlines
+    def get_full_text(self):
+        return "\n".join(self.lines)
