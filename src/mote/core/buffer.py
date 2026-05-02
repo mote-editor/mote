@@ -1,6 +1,6 @@
 class Buffer:
     # Init func, takes text arg for loading text, defaults to empty string for new buffer
-    def __init__(self, text="", screen_height=24):
+    def __init__(self, text="", screen_height=24, screen_width=80):
         # Store text as lots of lines, split by newlines if text is given in the args
         self.lines = text.splitlines() if text else [""]
         # Cursor x and y positions
@@ -15,9 +15,17 @@ class Buffer:
         self.dirty = False
         # Screen height for calculating visible lines and scrolling
         self.screen_height = screen_height
+        # Screen width for calculating visible columns and horizontal scrolling
+        self.screen_width = screen_width
+        # Row offset for vertical scrolling
+        self.row_off = 0
+        # Column offset for horizontal scrolling
+        self.col_off = 0
     
-    def resize_screen(self, new_height):
+    def resize_screen(self, new_height, new_width=None):
         self.screen_height = new_height
+        if new_width is not None:
+            self.screen_width = new_width
         self._check_scroll()
 
     # Get line func, takes index arg for which line to get, defaults to current cursor y position
@@ -41,6 +49,7 @@ class Buffer:
         self.cx += 1
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
+        self._check_scroll()
 
     def delete_char(self):
         # Mark buffer as dirty since its changing it
@@ -63,6 +72,7 @@ class Buffer:
             self.cx = prev_len
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
+        self._check_scroll()
 
     # Split line func, splits the current line at the cursor position into two lines
     def split_line(self):
@@ -143,13 +153,21 @@ class Buffer:
         self.clear_selection()
     
     def _check_scroll(self):
-        # If cursor moved above the top of the screen
+        # Vertical scrolling: If cursor moved above the top of the screen
         if self.cy < self.row_off:
             self.row_off = self.cy
         
         # If cursor moved below the bottom of the screen
         elif self.cy >= self.row_off + self.screen_height:
             self.row_off = self.cy - self.screen_height + 1
+        
+        # Horizontal scrolling: If cursor moved left of the visible area
+        if self.cx < self.col_off:
+            self.col_off = self.cx
+        
+        # If cursor moved right of the visible area
+        elif self.cx >= self.col_off + self.screen_width:
+            self.col_off = self.cx - self.screen_width + 1
 
     # Move cursor up one line, using effective cursor position
     def move_up(self):
@@ -176,6 +194,7 @@ class Buffer:
             self.cy -= 1
             self.cx = len(self.lines[self.cy])
             self._effective_cx = self.cx
+        self._check_scroll()
     
     # Move cursor right, resetting effective cursor
     def move_right(self):
@@ -187,6 +206,7 @@ class Buffer:
             self.cy += 1
             self.cx = 0
             self._effective_cx = self.cx
+        self._check_scroll()
 
     # Get full text func, returns the full text of the buffer by joining all lines with newlines
     def get_full_text(self):
@@ -200,6 +220,11 @@ class Buffer:
         return start, end
     
     # Get visible lines func, takes screen_height to determine which lines to return for rendering
-    def get_visible_lines(self, screen_height):
+    def get_visible_lines(self, screen_height, screen_width=None):
+        if screen_width is None:
+            screen_width = self.screen_width
         start, end = self.get_visible_range(screen_height)
-        return self.lines[start:end]
+        lines = self.lines[start:end]
+        # Apply horizontal scrolling by slicing each line based on col_off
+        scrolled_lines = [line[self.col_off:self.col_off + screen_width] for line in lines]
+        return scrolled_lines
