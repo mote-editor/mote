@@ -228,3 +228,13 @@ class Buffer:
         # Apply horizontal scrolling by slicing each line based on col_off
         scrolled_lines = [line[self.col_off:self.col_off + screen_width] for line in lines]
         return scrolled_lines
+    
+    # Go to line func, moves cursor to specified line number (1-indexed)
+    def goto_line(self, line_num):
+        # Convert to 0-indexed and clamp to valid range
+        line_index = max(0, min(line_num - 1, len(self.lines) - 1))
+        self.cy = line_index
+        # Move cursor to beginning of line and reset effective cursor
+        self.cx = 0
+        self._effective_cx = 0
+        self._check_scroll()
