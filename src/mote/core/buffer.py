@@ -92,6 +92,7 @@ class Buffer:
         self.cx = 0
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
+        self._check_scroll()
 
     # Start selection func, sets the selection starting coordinates to the current cursor position
     def start_selection(self):
