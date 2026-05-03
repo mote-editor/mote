@@ -247,7 +247,7 @@ class Buffer:
         self._effective_cx = 0
         self._check_scroll()
     
-    # Find all occurrences of a pattern in the buffer, takes pattern arg for text or regex to search for, and use_regex boolean to determine how to interpret the pattern, returns list of tuples (line, col, end_col) for each occurrence found
+    # Find all occurrences of a pattern in the buffer, takes pattern arg for text or regex to search for, and use_regex boolean to determine how to interpret the pattern, returns list of tuples (start_line, start_col, end_line, end_col) for each occurrence found
     def find(self, pattern, use_regex=False):
         occurrences = []
         full_text = self.get_full_text()
@@ -258,10 +258,10 @@ class Buffer:
                 for match in re.finditer(pattern, full_text):
                     start_pos = match.start()
                     end_pos = match.end()
-                    # Convert absolute position to line and column
-                    line, col = self._pos_to_line_col(start_pos)
-                    _, end_col = self._pos_to_line_col(end_pos)
-                    occurrences.append((line, col, end_col if line == self._pos_to_line_col(end_pos)[0] else len(self.lines[line])))
+                    # Convert absolute positions to line and column
+                    start_line, start_col = self._pos_to_line_col(start_pos)
+                    end_line, end_col = self._pos_to_line_col(end_pos)
+                    occurrences.append((start_line, start_col, end_line, end_col))
             else:
                 # Use literal text matching
                 search_pos = 0
@@ -269,9 +269,9 @@ class Buffer:
                     pos = full_text.find(pattern, search_pos)
                     if pos == -1:
                         break
-                    line, col = self._pos_to_line_col(pos)
-                    end_col = col + len(pattern)
-                    occurrences.append((line, col, end_col))
+                    start_line, start_col = self._pos_to_line_col(pos)
+                    end_line, end_col = self._pos_to_line_col(pos + len(pattern))
+                    occurrences.append((start_line, start_col, end_line, end_col))
                     search_pos = pos + 1
         except re.error:
             # Invalid regex pattern
@@ -298,19 +298,39 @@ class Buffer:
         self.lines = new_text.splitlines() if new_text else [""]
         return count
     
-    # Replace at a specific location, takes location tuple (line, col, end_col) from find() and replacement text, returns True if replacement was made
+    # Replace at a specific location, takes location tuple (start_line, start_col, end_line, end_col) from find() and replacement text, returns True if replacement was made
     def replace_specific(self, location, replacement):
-        if not isinstance(location, tuple) or len(location) != 3:
+        if not isinstance(location, tuple) or len(location) != 4:
             return False
         
-        line_num, col, end_col = location
+        start_line, start_col, end_line, end_col = location
         
-        if line_num < 0 or line_num >= len(self.lines):
+        # Validate bounds
+        if start_line < 0 or start_line >= len(self.lines):
+            return False
+        if end_line < 0 or end_line >= len(self.lines):
+            return False
+        if start_line > end_line:
             return False
         
         self.dirty = True
-        line = self.lines[line_num]
-        self.lines[line_num] = line[:col] + replacement + line[end_col:]
+        
+        if start_line == end_line:
+            # Single line replacement
+            line = self.lines[start_line]
+            self.lines[start_line] = line[:start_col] + replacement + line[end_col:]
+        else:
+            # Multi-line replacement
+            # Keep the part before the match on the start line
+            start_line_text = self.lines[start_line][:start_col]
+            # Keep the part after the match on the end line
+            end_line_text = self.lines[end_line][end_col:]
+            # Combine with replacement
+            new_text = start_line_text + replacement + end_line_text
+            # Replace the affected lines
+            self.lines[start_line] = new_text
+            # Delete the lines in between
+            del self.lines[start_line + 1:end_line + 1]
         
         return True
     

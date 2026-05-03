@@ -19,8 +19,8 @@ def test_find_literal():
     occurrences = buf.find("hello", use_regex=False)
     print("Find 'hello' (literal):", occurrences)
     assert len(occurrences) == 2
-    assert occurrences[0] == (0, 0, 5)  # Line 0, col 0-5
-    assert occurrences[1] == (1, 0, 5)  # Line 1, col 0-5
+    assert occurrences[0] == (0, 0, 0, 5)  # Line 0, col 0-5
+    assert occurrences[1] == (1, 0, 1, 5)  # Line 1, col 0-5
 
 
 def test_find_regex():
@@ -106,6 +106,22 @@ if __name__ == "__main__":
     print()
     
     test_replace_specific_invalid_location()
+    print()
+    
+    # Test multi-line matches
+    print("Testing multi-line matches...")
+    buf = Buffer("line1\nline2\nline3")
+    occurrences = buf.find("line2\nline3", use_regex=False)
+    print("Multi-line find result:", occurrences)
+    assert len(occurrences) == 1
+    assert occurrences[0] == (1, 0, 2, 5)  # Starts at line 1, ends at line 2
+    
+    # Replace the multi-line match
+    success = buf.replace_specific(occurrences[0], "REPLACED")
+    print("Multi-line replace:", success)
+    print("Result:", buf.get_full_text())
+    assert success == True
+    assert buf.get_full_text() == "line1\nREPLACED"
     print()
     
     print("All tests passed!")
