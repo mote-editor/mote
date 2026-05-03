@@ -335,8 +335,8 @@ class Buffer:
             start_line_text = self.lines[start_line][:start_col]
             # Keep the part after the match on the end line
             end_line_text = self.lines[end_line][end_col:]
-            # Split replacement on newlines to preserve line invariant
-            repl_lines = replacement.split('\n')
+            # Split replacement using the same newline handling as the rest of the buffer
+            repl_lines = replacement.splitlines()
             
             # Construct new lines: first line + middle lines + last line
             new_lines = []
