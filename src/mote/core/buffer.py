@@ -1,3 +1,6 @@
+import re
+
+
 class Buffer:
     # Init func, takes text arg for loading text, defaults to empty string for new buffer
     def __init__(self, text="", screen_height=24, screen_width=80):
@@ -243,3 +246,151 @@ class Buffer:
         self.cx = 0
         self._effective_cx = 0
         self._check_scroll()
+    
+    # Find all occurrences of a pattern in the buffer, takes pattern arg for text or regex to search for, and use_regex boolean to determine how to interpret the pattern, returns list of tuples (start_line, start_col, end_line, end_col) for each occurrence found
+    def find(self, pattern, use_regex=False):
+        if not pattern:
+            return []
+        
+        occurrences = []
+        full_text = self.get_full_text()
+        
+        # Precompute start offset of each line to convert positions in O(num_matches)
+        line_offsets = []
+        current = 0
+        for line_text in self.lines:
+            line_offsets.append(current)
+            current += len(line_text) + 1  # +1 for the newline separator
+        
+        def pos_to_line_col(pos):
+            for i, offset in enumerate(line_offsets):
+                if offset + len(self.lines[i]) + 1 > pos:
+                    return i, pos - offset
+            return len(self.lines) - 1, len(self.lines[-1])
+        
+        try:
+            if use_regex:
+                # Use regex matching
+                for match in re.finditer(pattern, full_text):
+                    start_line, start_col = pos_to_line_col(match.start())
+                    end_line, end_col = pos_to_line_col(match.end())
+                    occurrences.append((start_line, start_col, end_line, end_col))
+            else:
+                # Use literal text matching
+                search_pos = 0
+                while True:
+                    pos = full_text.find(pattern, search_pos)
+                    if pos == -1:
+                        break
+                    start_line, start_col = pos_to_line_col(pos)
+                    end_line, end_col = pos_to_line_col(pos + len(pattern))
+                    occurrences.append((start_line, start_col, end_line, end_col))
+                    search_pos = pos + 1
+        except re.error:
+            # Invalid regex pattern
+            return []
+        
+        return occurrences
+    
+    # Replace all occurrences of a pattern, takes pattern arg for text or regex to search for, replacement arg for text to replace with, and use_regex boolean to determine how to interpret the pattern, returns number of replacements made
+    def replace_all(self, pattern, replacement, use_regex=False):
+        if not pattern:
+            return 0
+        
+        full_text = self.get_full_text()
+        count = 0
+        
+        try:
+            if use_regex:
+                new_text, count = re.subn(pattern, replacement, full_text)
+            else:
+                count = full_text.count(pattern)
+                new_text = full_text.replace(pattern, replacement)
+        except re.error:
+            return 0
+        
+        if new_text != full_text:
+            self.dirty = True
+            self.lines = new_text.splitlines() if new_text else [""]
+            self.cy = min(self.cy, len(self.lines) - 1)
+            self.cx = min(self.cx, len(self.lines[self.cy]))
+            self._effective_cx = self.cx
+            self._check_scroll()
+        return count
+    
+    # Replace at a specific location, takes location tuple (start_line, start_col, end_line, end_col) from find() and replacement text, returns True if replacement was made
+    def replace_specific(self, location, replacement):
+        if not isinstance(location, tuple) or len(location) != 4:
+            return False
+        
+        start_line, start_col, end_line, end_col = location
+        
+        # Validate bounds
+        if start_line < 0 or start_line >= len(self.lines):
+            return False
+        if end_line < 0 or end_line >= len(self.lines):
+            return False
+        if start_line > end_line:
+            return False
+        if start_col < 0 or start_col > len(self.lines[start_line]):
+            return False
+        if end_col < 0 or end_col > len(self.lines[end_line]):
+            return False
+        if start_line == end_line and start_col > end_col:
+            return False
+        
+        self.dirty = True
+        
+        if start_line == end_line:
+            # Single line replacement
+            line = self.lines[start_line]
+            self.lines[start_line] = line[:start_col] + replacement + line[end_col:]
+        else:
+            # Multi-line replacement
+            # Keep the part before the match on the start line
+            start_line_text = self.lines[start_line][:start_col]
+            # Keep the part after the match on the end line
+            end_line_text = self.lines[end_line][end_col:]
+            # Split replacement using the same newline handling as the rest of the buffer
+            repl_lines = replacement.splitlines()
+            
+            # Construct new lines: first line + middle lines + last line
+            new_lines = []
+            if not repl_lines:
+                # Empty replacement - join surrounding text into one line
+                new_lines.append(start_line_text + end_line_text)
+            elif len(repl_lines) == 1:
+                # Single piece replacement - combine with surrounding text
+                new_lines.append(start_line_text + repl_lines[0] + end_line_text)
+            else:
+                # Multiple pieces - first line gets start text, last line gets end text
+                new_lines.append(start_line_text + repl_lines[0])
+                for middle_piece in repl_lines[1:-1]:
+                    new_lines.append(middle_piece)
+                new_lines.append(repl_lines[-1] + end_line_text)
+            
+            # Replace the start line and insert new lines
+            self.lines[start_line:end_line + 1] = new_lines
+        
+        self.cy = min(self.cy, len(self.lines) - 1)
+        self.cx = min(self.cx, len(self.lines[self.cy]))
+        self._effective_cx = self.cx
+        self.select_x = None
+        self.select_y = None
+        self._check_scroll()
+        
+        return True
+    
+    # Helper function to convert absolute position in full text to line and column
+    def _pos_to_line_col(self, pos):
+        """Convert absolute position in full text to (line, col)."""
+        current_pos = 0
+        
+        for i, line_text in enumerate(self.lines):
+            line_length = len(line_text) + 1  # +1 for newline
+            if current_pos + line_length > pos:
+                return i, pos - current_pos
+            current_pos += line_length
+        
+        # Position is at the end
+        return len(self.lines) - 1, len(self.lines[-1])
