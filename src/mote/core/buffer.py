@@ -1,3 +1,6 @@
+import re
+
+
 class Buffer:
     # Init func, takes text arg for loading text, defaults to empty string for new buffer
     def __init__(self, text="", screen_height=24, screen_width=80):
@@ -243,3 +246,87 @@ class Buffer:
         self.cx = 0
         self._effective_cx = 0
         self._check_scroll()
+    
+    # Find all occurrences of a pattern in the buffer, takes pattern arg for text or regex to search for, and use_regex boolean to determine how to interpret the pattern, returns list of tuples (line, col, end_col) for each occurrence found
+    def find(self, pattern, use_regex=False):
+        occurrences = []
+        full_text = self.get_full_text()
+        
+        try:
+            if use_regex:
+                # Use regex matching
+                for match in re.finditer(pattern, full_text):
+                    start_pos = match.start()
+                    end_pos = match.end()
+                    # Convert absolute position to line and column
+                    line, col = self._pos_to_line_col(start_pos)
+                    _, end_col = self._pos_to_line_col(end_pos)
+                    occurrences.append((line, col, end_col if line == self._pos_to_line_col(end_pos)[0] else len(self.lines[line])))
+            else:
+                # Use literal text matching
+                search_pos = 0
+                while True:
+                    pos = full_text.find(pattern, search_pos)
+                    if pos == -1:
+                        break
+                    line, col = self._pos_to_line_col(pos)
+                    end_col = col + len(pattern)
+                    occurrences.append((line, col, end_col))
+                    search_pos = pos + 1
+        except re.error:
+            # Invalid regex pattern
+            return []
+        
+        return occurrences
+    
+    # Replace all occurrences of a pattern, takes pattern arg for text or regex to search for, replacement arg for text to replace with, and use_regex boolean to determine how to interpret the pattern, returns number of replacements made
+    def replace_all(self, pattern, replacement, use_regex=False):
+        self.dirty = True
+        full_text = self.get_full_text()
+        count = 0
+        
+        try:
+            if use_regex:
+                new_text, count = re.subn(pattern, replacement, full_text)
+            else:
+                count = full_text.count(pattern)
+                new_text = full_text.replace(pattern, replacement)
+        except re.error:
+            return 0
+        
+        # Update buffer with new text
+        self.lines = new_text.splitlines() if new_text else [""]
+        return count
+    
+    # Replace at a specific location, takes location tuple (line, col, end_col) from find() and replacement text, returns True if replacement was made
+    def replace_specific(self, location, replacement):
+        if not isinstance(location, tuple) or len(location) != 3:
+            return False
+        
+        line_num, col, end_col = location
+        
+        if line_num < 0 or line_num >= len(self.lines):
+            return False
+        
+        self.dirty = True
+        line = self.lines[line_num]
+        self.lines[line_num] = line[:col] + replacement + line[end_col:]
+        
+        return True
+    
+    # Helper function to convert absolute position in full text to line and column
+    def _pos_to_line_col(self, pos):
+        """Convert absolute position in full text to (line, col)."""
+        full_text = self.get_full_text()
+        line = 0
+        current_pos = 0
+        
+        for i, line_text in enumerate(self.lines):
+            line_length = len(line_text) + 1  # +1 for newline
+            if current_pos + line_length > pos:
+                col = pos - current_pos
+                return i, col
+            current_pos += line_length
+        
+        # Position is at the end
+        return len(self.lines) - 1, len(self.lines[-1])
