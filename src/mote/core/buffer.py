@@ -249,18 +249,31 @@ class Buffer:
     
     # Find all occurrences of a pattern in the buffer, takes pattern arg for text or regex to search for, and use_regex boolean to determine how to interpret the pattern, returns list of tuples (start_line, start_col, end_line, end_col) for each occurrence found
     def find(self, pattern, use_regex=False):
+        if not pattern:
+            return []
+        
         occurrences = []
         full_text = self.get_full_text()
+        
+        # Precompute start offset of each line to convert positions in O(num_matches)
+        line_offsets = []
+        current = 0
+        for line_text in self.lines:
+            line_offsets.append(current)
+            current += len(line_text) + 1  # +1 for the newline separator
+        
+        def pos_to_line_col(pos):
+            for i, offset in enumerate(line_offsets):
+                if offset + len(self.lines[i]) + 1 > pos:
+                    return i, pos - offset
+            return len(self.lines) - 1, len(self.lines[-1])
         
         try:
             if use_regex:
                 # Use regex matching
                 for match in re.finditer(pattern, full_text):
-                    start_pos = match.start()
-                    end_pos = match.end()
-                    # Convert absolute positions to line and column
-                    start_line, start_col = self._pos_to_line_col(start_pos)
-                    end_line, end_col = self._pos_to_line_col(end_pos)
+                    start_line, start_col = pos_to_line_col(match.start())
+                    end_line, end_col = pos_to_line_col(match.end())
                     occurrences.append((start_line, start_col, end_line, end_col))
             else:
                 # Use literal text matching
@@ -269,8 +282,8 @@ class Buffer:
                     pos = full_text.find(pattern, search_pos)
                     if pos == -1:
                         break
-                    start_line, start_col = self._pos_to_line_col(pos)
-                    end_line, end_col = self._pos_to_line_col(pos + len(pattern))
+                    start_line, start_col = pos_to_line_col(pos)
+                    end_line, end_col = pos_to_line_col(pos + len(pattern))
                     occurrences.append((start_line, start_col, end_line, end_col))
                     search_pos = pos + 1
         except re.error:
@@ -281,6 +294,9 @@ class Buffer:
     
     # Replace all occurrences of a pattern, takes pattern arg for text or regex to search for, replacement arg for text to replace with, and use_regex boolean to determine how to interpret the pattern, returns number of replacements made
     def replace_all(self, pattern, replacement, use_regex=False):
+        if not pattern:
+            return 0
+        
         full_text = self.get_full_text()
         count = 0
         
@@ -340,7 +356,10 @@ class Buffer:
             
             # Construct new lines: first line + middle lines + last line
             new_lines = []
-            if len(repl_lines) == 1:
+            if not repl_lines:
+                # Empty replacement - join surrounding text into one line
+                new_lines.append(start_line_text + end_line_text)
+            elif len(repl_lines) == 1:
                 # Single piece replacement - combine with surrounding text
                 new_lines.append(start_line_text + repl_lines[0] + end_line_text)
             else:
@@ -365,15 +384,12 @@ class Buffer:
     # Helper function to convert absolute position in full text to line and column
     def _pos_to_line_col(self, pos):
         """Convert absolute position in full text to (line, col)."""
-        full_text = self.get_full_text()
-        line = 0
         current_pos = 0
         
         for i, line_text in enumerate(self.lines):
             line_length = len(line_text) + 1  # +1 for newline
             if current_pos + line_length > pos:
-                col = pos - current_pos
-                return i, col
+                return i, pos - current_pos
             current_pos += line_length
         
         # Position is at the end
