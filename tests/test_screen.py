@@ -101,8 +101,7 @@ class TestColorSetup:
         
         with patch('curses.curs_set'):
             with patch('curses.has_colors', return_value=False):
-                with patch.object(Screen, '_setup_colors', return_value={}):
-                    screen = Screen(mock_window, theme=theme)
+                screen = Screen(mock_window, theme=theme)
         
         assert screen.styles == {}
     
@@ -124,16 +123,28 @@ class TestColorSetup:
         mock_setup_colors.assert_called_once_with(theme)
     
     def test_setup_colors_respects_terminal_limits(self):
-        """Test that _setup_colors method exists and can be called."""
+        """Test that _setup_colors respects terminal color pair limits."""
         mock_window = Mock()
-        theme = {"TEXT": (7, 0, -1)}
-        
-        # Simply verify that _setup_colors is called and returns the styles
-        with patch('curses.curs_set'):
-            with patch('curses.has_colors', return_value=False):
-                screen = Screen(mock_window, theme=theme)
-                # The method should have been called by __init__
-                assert isinstance(screen.styles, dict)
+        theme = {
+            "TEXT": (7, 0, -1),
+            "HEADER": (3, 3, 4),
+            "FOOTER": (5, 5, -1),
+        }
+
+        with patch('curses.has_colors', return_value=True), \
+             patch('curses.start_color'), \
+             patch('curses.use_default_colors'), \
+             patch('curses.COLORS', 8, create=True), \
+             patch('curses.COLOR_PAIRS', 2, create=True), \
+             patch('curses.init_pair') as mock_init_pair, \
+             patch('curses.color_pair', side_effect=lambda i: i * 256):
+            screen = Screen.__new__(Screen)
+            screen.window = mock_window
+            styles = screen._setup_colors(theme)
+
+        # COLOR_PAIRS=2 means only i=1 is registered (loop breaks when i >= 2)
+        assert len(styles) == 1
+        assert mock_init_pair.call_count == 1
 
 
 class TestDrawing:

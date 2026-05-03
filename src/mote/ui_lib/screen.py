@@ -8,7 +8,10 @@ class Screen:
         
         # 1 Terminal Preferences (Only initialized on the root screen)
         if theme:
-            curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
+            try:
+                curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
+            except curses.error:
+                pass
             self.window.keypad(True) # Enable Arrow keys F-keys so on
             self.window.nodelay(False) # Wait for user input (blocking)
             self.styles = self._setup_colors(theme)
@@ -93,11 +96,12 @@ class Screen:
 
         # Handle background filling for headers and footers
         if fill_line:
-            # Fill the row background before placing text
-            self.window.attron(style_attr)
-            self.window.move(y, 0)
-            self.window.hline(' ', w) 
-            self.window.attroff(style_attr)
+            if 0 <= y < h:
+                # Fill the row background before placing text
+                self.window.attron(style_attr)
+                self.window.move(y, 0)
+                self.window.hline(' ', w)
+                self.window.attroff(style_attr)
 
         # Calculate X coordinate based on requested justification
         if align == "center":
