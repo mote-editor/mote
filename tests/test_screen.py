@@ -137,9 +137,8 @@ class TestColorSetup:
              patch('curses.COLORS', 8, create=True), \
              patch('curses.COLOR_PAIRS', 2, create=True), \
              patch('curses.init_pair') as mock_init_pair, \
-             patch('curses.color_pair', side_effect=lambda i: i * 256):
-            screen = Screen.__new__(Screen)
-            screen.window = mock_window
+             patch('curses.color_pair', side_effect=lambda i: i * 256):  # distinct mock attr per pair
+            screen = Screen(mock_window)  # no theme; skips color init
             styles = screen._setup_colors(theme)
 
         # COLOR_PAIRS=2 means only i=1 is registered (loop breaks when i >= 2)
