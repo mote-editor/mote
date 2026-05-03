@@ -335,12 +335,23 @@ class Buffer:
             start_line_text = self.lines[start_line][:start_col]
             # Keep the part after the match on the end line
             end_line_text = self.lines[end_line][end_col:]
-            # Combine with replacement
-            new_text = start_line_text + replacement + end_line_text
-            # Replace the affected lines
-            self.lines[start_line] = new_text
-            # Delete the lines in between
-            del self.lines[start_line + 1:end_line + 1]
+            # Split replacement on newlines to preserve line invariant
+            repl_lines = replacement.split('\n')
+            
+            # Construct new lines: first line + middle lines + last line
+            new_lines = []
+            if len(repl_lines) == 1:
+                # Single piece replacement - combine with surrounding text
+                new_lines.append(start_line_text + repl_lines[0] + end_line_text)
+            else:
+                # Multiple pieces - first line gets start text, last line gets end text
+                new_lines.append(start_line_text + repl_lines[0])
+                for middle_piece in repl_lines[1:-1]:
+                    new_lines.append(middle_piece)
+                new_lines.append(repl_lines[-1] + end_line_text)
+            
+            # Replace the start line and insert new lines
+            self.lines[start_line:end_line + 1] = new_lines
         
         return True
     
