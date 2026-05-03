@@ -316,6 +316,12 @@ class Buffer:
             return False
         if start_line > end_line:
             return False
+        if start_col < 0 or start_col > len(self.lines[start_line]):
+            return False
+        if end_col < 0 or end_col > len(self.lines[end_line]):
+            return False
+        if start_line == end_line and start_col > end_col:
+            return False
         
         self.dirty = True
         
