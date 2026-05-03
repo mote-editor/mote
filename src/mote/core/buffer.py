@@ -281,7 +281,6 @@ class Buffer:
     
     # Replace all occurrences of a pattern, takes pattern arg for text or regex to search for, replacement arg for text to replace with, and use_regex boolean to determine how to interpret the pattern, returns number of replacements made
     def replace_all(self, pattern, replacement, use_regex=False):
-        self.dirty = True
         full_text = self.get_full_text()
         count = 0
         
@@ -294,8 +293,13 @@ class Buffer:
         except re.error:
             return 0
         
-        # Update buffer with new text
-        self.lines = new_text.splitlines() if new_text else [""]
+        if new_text != full_text:
+            self.dirty = True
+            self.lines = new_text.splitlines() if new_text else [""]
+            self.cy = min(self.cy, len(self.lines) - 1)
+            self.cx = min(self.cx, len(self.lines[self.cy]))
+            self._effective_cx = self.cx
+            self._check_scroll()
         return count
     
     # Replace at a specific location, takes location tuple (start_line, start_col, end_line, end_col) from find() and replacement text, returns True if replacement was made
