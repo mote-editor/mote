@@ -31,6 +31,18 @@ class TestScreenInitialization:
         mock_window.keypad.assert_not_called()
         mock_window.nodelay.assert_not_called()
     
+    def test_screen_initialization_with_empty_theme(self):
+        """Test that root screen with an empty theme dict still enables keypad/nodelay."""
+        mock_window = Mock()
+        
+        with patch('curses.curs_set'), \
+             patch.object(Screen, '_setup_colors', return_value={}):
+            screen = Screen(mock_window, theme={})
+        
+        mock_window.keypad.assert_called_once_with(True)
+        mock_window.nodelay.assert_called_once_with(False)
+        assert screen.styles == {}
+    
     def test_cursor_shown_on_root_screen(self):
         """Test that cursor is shown on root screen initialization."""
         mock_window = Mock()
@@ -144,6 +156,24 @@ class TestColorSetup:
         # COLOR_PAIRS=2 means only i=1 is registered (loop breaks when i >= 2)
         assert len(styles) == 1
         assert mock_init_pair.call_count == 1
+
+    def test_setup_colors_use_default_colors_error(self):
+        """Test that use_default_colors() raising curses.error is handled gracefully."""
+        mock_window = Mock()
+        theme = {"TEXT": (7, 0, -1)}
+
+        with patch('curses.has_colors', return_value=True), \
+             patch('curses.start_color'), \
+             patch('curses.use_default_colors', side_effect=curses.error("not supported")), \
+             patch('curses.COLORS', 8, create=True), \
+             patch('curses.COLOR_PAIRS', 64, create=True), \
+             patch('curses.init_pair'), \
+             patch('curses.color_pair', return_value=256), \
+             patch('curses.curs_set'):
+            # Should not raise even though use_default_colors fails
+            screen = Screen(mock_window, theme=theme)
+
+        assert "TEXT" in screen.styles
 
 
 class TestDrawing:
@@ -278,6 +308,17 @@ class TestDrawing:
         # Should use 0 as default for style attribute
         call_args = mock_window.addstr.call_args
         assert call_args[0][3] == 0  # style_attr argument
+
+    def test_draw_fill_line_at_bottom_row(self):
+        """Test fill_line at y == height-1 doesn't crash even if hline raises."""
+        mock_window = Mock()
+        mock_window.getmaxyx.return_value = (24, 80)
+        mock_window.hline.side_effect = curses.error("lower-right cell")
+        screen = Screen(mock_window)
+        screen.styles = {"FOOTER": 1}
+
+        # Should not raise even though hline raises at the bottom row
+        screen.draw(23, "Footer", align="left", style="FOOTER", fill_line=True)
 
 
 class TestCursorManagement:

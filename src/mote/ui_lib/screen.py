@@ -7,7 +7,7 @@ class Screen:
         self.window = window
         
         # 1 Terminal Preferences (Only initialized on the root screen)
-        if theme:
+        if theme is not None:
             try:
                 curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
             except curses.error:
@@ -43,7 +43,10 @@ class Screen:
             return {}
 
         curses.start_color()
-        curses.use_default_colors()
+        try:
+            curses.use_default_colors()
+        except curses.error:
+            pass
         
         registered_styles = {}
         max_colors = curses.COLORS # Detection: 8, 16, or 256?
@@ -97,11 +100,14 @@ class Screen:
         # Handle background filling for headers and footers
         if fill_line:
             if 0 <= y < h:
-                # Fill the row background before placing text
-                self.window.attron(style_attr)
-                self.window.move(y, 0)
-                self.window.hline(' ', w)
-                self.window.attroff(style_attr)
+                try:
+                    # Fill the row background before placing text
+                    self.window.attron(style_attr)
+                    self.window.move(y, 0)
+                    self.window.hline(' ', w)
+                    self.window.attroff(style_attr)
+                except curses.error:
+                    pass
 
         # Calculate X coordinate based on requested justification
         if align == "center":
