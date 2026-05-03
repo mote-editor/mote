@@ -353,6 +353,13 @@ class Buffer:
             # Replace the start line and insert new lines
             self.lines[start_line:end_line + 1] = new_lines
         
+        self.cy = min(self.cy, len(self.lines) - 1)
+        self.cx = min(self.cx, len(self.lines[self.cy]))
+        self._effective_cx = self.cx
+        self.select_x = None
+        self.select_y = None
+        self._check_scroll()
+        
         return True
     
     # Helper function to convert absolute position in full text to line and column
