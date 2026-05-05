@@ -1,4 +1,5 @@
 import curses
+from mote import __version__
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
 from mote.ui.pallette import Palette
@@ -153,7 +154,7 @@ class ScreenLayout:
             buffer_name = f"{buffer_name}*"
         self.top.draw(0, " Mote Editor", align="left", style="BAR", fill_line=True)
         self.top.draw(0, buffer_name, align="center", style="BAR", fill_line=False)
-        self.top.draw(0, "PROTOTYPE ", align="right", style="BAR", fill_line=False)
+        self.top.draw(0, f"v{__version__} ", align="right", style="BAR", fill_line=False)
         self.editor.render(move_cursor=False)
         self.bottom.draw(0, "", align="left", style="BAR", fill_line=True)
         self.palette.render(move_cursor=False)
