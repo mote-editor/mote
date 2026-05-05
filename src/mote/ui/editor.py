@@ -28,7 +28,7 @@ class Editor:
             # Width needed for line numbers (e.g., "1234: " for up to 4 digit line numbers)
             self.line_num_width = len(str(len(self.buffer.lines))) + 2
 
-    def render(self):
+    def render(self, move_cursor=True):
         """Draw the buffer content to the slice."""
         self.slice.clear()
         height, width = self.slice.get_dimensions()
@@ -62,7 +62,8 @@ class Editor:
                 self.slice.draw_at_coords(row, 0, visible_line)
         
         # Draw cursor
-        self._draw_cursor()
+        if move_cursor:
+            self._draw_cursor()
 
     def _draw_cursor(self):
         """Position cursor at buffer cursor location."""
@@ -77,6 +78,10 @@ class Editor:
         cursor_x = max(0, min(cursor_x, width - 1))
         
         self.slice.move_cursor(cursor_y, cursor_x)
+
+    def move_cursor(self):
+        """Move cursor to the editor position."""
+        self._draw_cursor()
 
     def handle_key(self, key):
         """Process a key input and update buffer accordingly.

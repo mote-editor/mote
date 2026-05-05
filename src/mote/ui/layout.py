@@ -1,6 +1,7 @@
 import curses
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
+from mote.ui.pallette import Palette
 
 
 class ScreenLayout:
@@ -32,6 +33,7 @@ class ScreenLayout:
         
         # Create editor for the middle slice
         self.editor = Editor(self.middle, buffer=buffer, show_line_numbers=show_line_numbers)
+        self.palette = Palette(self.bottom)
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
@@ -52,8 +54,19 @@ class ScreenLayout:
     def refresh_all(self):
         """Refresh all slices and update the physical display."""
         self.top.refresh()
-        self.bottom.refresh()
-        self.middle.refresh()
+        if self.input_focus == "bottom":
+            self.middle.refresh()
+            self.bottom.refresh()
+        else:
+            self.bottom.refresh()
+            self.middle.refresh()
+        Screen.update_physical()
+        if self.input_focus == "bottom":
+            self.palette.move_cursor()
+            self.bottom.refresh()
+        else:
+            self.editor.move_cursor()
+            self.middle.refresh()
         Screen.update_physical()
 
     def clear_all(self):
@@ -101,8 +114,18 @@ class ScreenLayout:
         if key == 27:  # ESC key
             if self.input_focus == "middle":
                 self.input_focus = "bottom"
+                self.bottom.draw(0, "", align="left", style="BAR", fill_line=True)
+                self.palette.render(move_cursor=True)
+                self.bottom.refresh()
             else:
                 self.input_focus = "middle"
+                self.editor.render(move_cursor=True)
+                self.middle.refresh()
+            if self.input_focus == "bottom":
+                self.bottom.refresh()
+            else:
+                self.middle.refresh()
+            Screen.update_physical()
             return (True, None)
         
         # Handle ENTER in bottom slice - return to middle
@@ -113,6 +136,8 @@ class ScreenLayout:
         # Pass input to editor if middle has focus (including Enter for newline)
         if self.input_focus == "middle":
             self.editor.handle_key(key)
+        elif self.input_focus == "bottom":
+            self.palette.handle_key(key)
         
         # Other keys are handled by the application layer
         return (True, key)
@@ -126,10 +151,16 @@ class ScreenLayout:
         buffer_name = self.editor.buffer.name or "Untitled"
         if self.editor.buffer.dirty:
             buffer_name = f"{buffer_name}*"
-        self.top.draw(0, "Mote Editor", align="left", style="BAR", fill_line=True)
+        self.top.draw(0, " Mote Editor", align="left", style="BAR", fill_line=True)
         self.top.draw(0, buffer_name, align="center", style="BAR", fill_line=False)
-        self.top.draw(0, "PROTOTYPE", align="right", style="BAR", fill_line=False)
-        self.editor.render()
+        self.top.draw(0, "PROTOTYPE ", align="right", style="BAR", fill_line=False)
+        self.editor.render(move_cursor=False)
+        self.bottom.draw(0, "", align="left", style="BAR", fill_line=True)
+        self.palette.render(move_cursor=False)
+        if self.input_focus == "bottom":
+            self.palette.move_cursor()
+        else:
+            self.editor.move_cursor()
 
     def get_editor(self):
         """Get the editor instance."""

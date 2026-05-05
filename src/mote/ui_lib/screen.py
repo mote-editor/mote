@@ -141,6 +141,15 @@ class Screen:
     def move_cursor(self, y, x):
         try:
             self.window.move(y, x)
+            try:
+                self.window.cursyncup()
+            except curses.error:
+                pass
+            try:
+                beg_y, beg_x = self.window.getbegyx()
+                curses.setsyx(beg_y + y, beg_x + x)
+            except curses.error:
+                pass
         except curses.error:
             pass
 
