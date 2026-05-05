@@ -122,6 +122,8 @@ class ScreenLayout:
     def render(self):
         """Render all components to the screen."""
         buffer_name = self.editor.buffer.name or "Untitled"
+        if self.editor.buffer.dirty:
+            buffer_name = f"{buffer_name}*"
         self.top.draw(0, "Mote Editor", align="left", style="BAR", fill_line=True)
         self.top.draw(0, buffer_name, align="center", style="BAR", fill_line=False)
         self.top.draw(0, "PROTOTYPE", align="right", style="BAR", fill_line=False)

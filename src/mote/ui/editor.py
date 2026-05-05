@@ -55,7 +55,7 @@ class Editor:
             
             # Draw line number if enabled
             if self.show_line_numbers:
-                line_num_str = str(line_idx + 1).rjust(self.line_num_width - 2) + "| "
+                line_num_str = str(line_idx + 1).rjust(self.line_num_width - 2) + "│ "
                 self.slice.draw_at_coords(row, 0, line_num_str)
                 self.slice.draw_at_coords(row, self.line_num_width, visible_line)
             else:
