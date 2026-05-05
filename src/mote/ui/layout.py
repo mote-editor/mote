@@ -1,5 +1,6 @@
 import curses
 from mote.ui_lib.screen import Screen
+from mote.ui.editor import Editor
 
 
 class ScreenLayout:
@@ -9,7 +10,7 @@ class ScreenLayout:
     Handles input focus switching and command dispatch.
     """
 
-    def __init__(self, window, theme=None, command_handler=None):
+    def __init__(self, window, theme=None, command_handler=None, buffer=None, show_line_numbers=False):
         """Initialize layout with the given window and optional theme."""
         # Create the main screen
         self.main_screen = Screen(window, theme)
@@ -28,6 +29,9 @@ class ScreenLayout:
         # Starts at y=1 and has height of (total_height - 2)
         middle_height = max(1, height - 2)
         self.middle = self.main_screen.create_slice(middle_height, width, 1, 0)
+        
+        # Create editor for the middle slice
+        self.editor = Editor(self.middle, buffer=buffer, show_line_numbers=show_line_numbers)
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
@@ -48,8 +52,8 @@ class ScreenLayout:
     def refresh_all(self):
         """Refresh all slices and update the physical display."""
         self.top.refresh()
-        self.middle.refresh()
         self.bottom.refresh()
+        self.middle.refresh()
         Screen.update_physical()
 
     def clear_all(self):
@@ -61,7 +65,7 @@ class ScreenLayout:
     def _is_ctrl_key(self, key):
         """Check if key is a ctrl combination (1-26)."""
         # Ctrl+A = 1, Ctrl+B = 2, ... Ctrl+Z = 26
-        return 1 <= key <= 26
+        return 1 <= key <= 26 and key not in (10, 13)
 
     def _get_ctrl_char(self, key):
         """Convert ctrl key code (1-26) to char (a-z)."""
@@ -100,9 +104,13 @@ class ScreenLayout:
             return (True, None)
         
         # Handle ENTER in bottom slice - return to middle
-        if key == ord('\n') and self.input_focus == "bottom":
+        if key in (10, 13) and self.input_focus == "bottom":
             self.input_focus = "middle"
             return (True, None)
+        
+        # Pass input to editor if middle has focus (including Enter for newline)
+        if self.input_focus == "middle":
+            self.editor.handle_key(key)
         
         # Other keys are handled by the application layer
         return (True, key)
@@ -110,3 +118,35 @@ class ScreenLayout:
     def get_current_input_focus(self):
         """Get the slice that currently has input focus."""
         return self.input_focus
+
+    def render(self):
+        """Render all components to the screen."""
+        self.editor.render()
+
+    def get_editor(self):
+        """Get the editor instance."""
+        return self.editor
+
+
+if __name__ == "__main__":
+    def main(window):
+        """Run the layout in test mode."""
+        layout = ScreenLayout(window, show_line_numbers=True)
+        
+        # Draw initial content
+        layout.top.draw(0, "Top Bar", align="left")
+        layout.bottom.draw(0, "Bottom Bar", align="left")
+        
+        # Main loop
+        try:
+            while True:
+                layout.render()
+                layout.refresh_all()
+                
+                should_continue, key = layout.handle_input()
+                if not should_continue:
+                    break
+        except KeyboardInterrupt:
+            pass
+    
+    curses.wrapper(main)
