@@ -2,6 +2,7 @@ import curses
 
 DEFAULT_THEME = {
     "TEXT": (7, 0, -1),
+    "BAR": (0, 0, curses.COLOR_RED),
 }
 
 class Screen:

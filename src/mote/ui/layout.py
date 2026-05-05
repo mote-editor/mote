@@ -122,9 +122,9 @@ class ScreenLayout:
     def render(self):
         """Render all components to the screen."""
         buffer_name = self.editor.buffer.name or "Untitled"
-        self.top.draw(0, "Mote Editor", align="left", fill_line=True)
-        self.top.draw(0, buffer_name, align="center", fill_line=False)
-        self.top.draw(0, "PROTOTYPE", align="right", fill_line=False)
+        self.top.draw(0, "Mote Editor", align="left", style="BAR", fill_line=True)
+        self.top.draw(0, buffer_name, align="center", style="BAR", fill_line=False)
+        self.top.draw(0, "PROTOTYPE", align="right", style="BAR", fill_line=False)
         self.editor.render()
 
     def get_editor(self):
@@ -138,8 +138,8 @@ if __name__ == "__main__":
         layout = ScreenLayout(window, show_line_numbers=True)
         
         # Draw initial content
-        layout.top.draw(0, "Top Bar", align="left")
-        layout.bottom.draw(0, "Bottom Bar", align="left")
+        layout.top.draw(0, "Top Bar", align="left", style="BAR", fill_line=True)
+        layout.bottom.draw(0, "Bottom Bar", align="left", style="BAR", fill_line=True)
         
         # Main loop
         try:
