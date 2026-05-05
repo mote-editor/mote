@@ -65,7 +65,7 @@ class ScreenLayout:
     def _is_ctrl_key(self, key):
         """Check if key is a ctrl combination (1-26)."""
         # Ctrl+A = 1, Ctrl+B = 2, ... Ctrl+Z = 26
-        return 1 <= key <= 26 and key not in (10, 13)
+        return 1 <= key <= 26 and key not in (9, 10, 13)
 
     def _get_ctrl_char(self, key):
         """Convert ctrl key code (1-26) to char (a-z)."""
@@ -91,9 +91,11 @@ class ScreenLayout:
         # Handle Ctrl+key combinations
         if self._is_ctrl_key(key):
             char = self._get_ctrl_char(key)
+            if char == "q":
+                return (False, char)
             if self.command_handler:
                 self.command_handler(char)
-            return (False, char)
+            return (True, char)
         
         # Handle ESC - toggle input focus
         if key == 27:  # ESC key

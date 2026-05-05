@@ -86,6 +86,9 @@ class Editor:
         """
         if key == ord('\n'):
             self.buffer.split_line()
+        elif key == ord('\t'):
+            for _ in range(4):
+                self.buffer.insert_char(' ')
         elif key in (ord('\b'), 8, 127, 263):  # Backspace
             self.buffer.delete_char()
         elif 32 <= key <= 126:  # Printable ASCII
