@@ -3,7 +3,7 @@ import re
 
 class Buffer:
     # Init func, takes text arg for loading text, defaults to empty string for new buffer
-    def __init__(self, text="", screen_height=24, screen_width=80, name=None):
+    def __init__(self, text="", screen_height=24, screen_width=80, name="Untitled"):
         # Store text as lots of lines, split by newlines if text is given in the args
         self.lines = text.splitlines() if text else [""]
         # Buffer name (e.g., filename or display label)
