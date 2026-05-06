@@ -1,6 +1,7 @@
 import curses
 import sys
 from mote import __version__
+from mote.core.command_handler import CommandHandler
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
 from mote.ui.pallette import Palette
@@ -118,7 +119,9 @@ class ScreenLayout:
             if char == "q":
                 return (False, char)
             if self.command_handler:
-                self.command_handler(char)
+                should_continue = self.command_handler(char)
+                if should_continue is False:
+                    return (False, char)
             return (True, char)
         
         # Handle ESC - toggle input focus
@@ -139,9 +142,15 @@ class ScreenLayout:
             Screen.update_physical()
             return (True, None)
         
-        # Handle ENTER in bottom slice - return to middle
+        # Handle ENTER in bottom slice - run command, clear, return to middle
         if key in (10, 13) and self.input_focus == "bottom":
+            command_text = self.palette.get_command().strip()
+            self.palette.clear()
             self.input_focus = "middle"
+            if command_text and self.command_handler:
+                should_continue = self.command_handler(command_text)
+                if should_continue is False:
+                    return (False, None)
             return (True, None)
         
         # Pass input to editor if middle has focus (including Enter for newline)
@@ -181,7 +190,11 @@ class ScreenLayout:
 if __name__ == "__main__":
     def main(window):
         """Run the layout in test mode."""
-        layout = ScreenLayout(window, show_line_numbers=True)
+        layout = ScreenLayout(
+            window,
+            show_line_numbers=True,
+            command_handler=CommandHandler(),
+        )
         
         # Draw initial content
         layout.top.draw(0, "Top Bar", align="left", style="BAR", fill_line=True)
