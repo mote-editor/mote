@@ -22,14 +22,18 @@ class TestScreenInitialization:
         mock_window.nodelay.assert_called_once_with(False)
     
     def test_screen_initialization_without_theme(self):
-        """Test creating a slice screen without theme."""
+        """Test Screen with no explicit theme uses DEFAULT_THEME with keypad/nodelay enabled.
+
+        When curses is not yet initialized, _setup_colors gracefully falls back
+        to an empty styles dict rather than raising curses.error.
+        """
         mock_window = Mock()
         screen = Screen(mock_window)
-        
+
         assert screen.window == mock_window
         assert screen.styles == {}
-        mock_window.keypad.assert_not_called()
-        mock_window.nodelay.assert_not_called()
+        mock_window.keypad.assert_called_once_with(True)
+        mock_window.nodelay.assert_called_once_with(False)
     
     def test_screen_initialization_with_empty_theme(self):
         """Test that root screen with an empty theme dict still enables keypad/nodelay."""
@@ -149,8 +153,8 @@ class TestColorSetup:
              patch('curses.COLORS', 8, create=True), \
              patch('curses.COLOR_PAIRS', 2, create=True), \
              patch('curses.init_pair') as mock_init_pair, \
-             patch('curses.color_pair', side_effect=lambda i: i * 256):  # distinct mock attr per pair
-            screen = Screen(mock_window)  # no theme; skips color init
+             patch('curses.color_pair', side_effect=lambda i: i * 256):
+            screen = Screen(mock_window, theme=False)  # skip color init
             styles = screen._setup_colors(theme)
 
         # COLOR_PAIRS=2 means only i=1 is registered (loop breaks when i >= 2)
@@ -327,6 +331,7 @@ class TestCursorManagement:
     def test_move_cursor(self):
         """Test moving the cursor."""
         mock_window = Mock()
+        mock_window.getbegyx.return_value = (0, 0)
         screen = Screen(mock_window)
         
         screen.move_cursor(10, 20)

@@ -1,23 +1,40 @@
 import curses
 
+DEFAULT_THEME = {
+    "TEXT": (7, 0, -1),
+    "BAR": (0, 0, curses.COLOR_RED),
+}
+
 class Screen:
     def __init__(self, window, theme=None):
         
         # Store the raw curses window
         self.window = window
         
-        # 1 Terminal Preferences (Only initialized on the root screen)
-        if theme is not None:
+        # Terminal Preferences
+        if theme is False:
+            # Slices inherit styles from the parent instead of re-initializing
+            self.styles = {}
+        elif theme is not None:
             try:
                 curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
             except curses.error:
                 pass
-            self.window.keypad(True) # Enable Arrow keys F-keys so on
-            self.window.nodelay(False) # Wait for user input (blocking)
             self.styles = self._setup_colors(theme)
         else:
-            # Slices inherit styles from the parent instead of re-initializing
-            self.styles = {}
+            try:
+                curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
+            except curses.error:
+                pass
+            try:
+                self.styles = self._setup_colors(DEFAULT_THEME)
+            except curses.error:
+                self.styles = {}
+
+        # Enable keypad decoding for arrow keys and function keys
+        self.window.keypad(True)
+        # Wait for user input (blocking)
+        self.window.nodelay(False)
 
     # Returns the (height, width) of the current window or slice
     def get_dimensions(self):
@@ -28,9 +45,12 @@ class Screen:
     def create_slice(self, h, w, y, x):
         # derwin creates a sub-window relative to the parent coordinates
         sub_win = self.window.derwin(h, w, y, x)
+
+        # Ensure keypad mode on slices for arrow keys
+        sub_win.keypad(True)
         
         # Create a new Screen instance wrapping the sub-window
-        new_slice = Screen(sub_win)
+        new_slice = Screen(sub_win, theme=False)
         
         # Share the parent's styles so colors and themes remain consistent
         new_slice.styles = self.styles 
@@ -124,6 +144,15 @@ class Screen:
     def move_cursor(self, y, x):
         try:
             self.window.move(y, x)
+            try:
+                self.window.cursyncup()
+            except curses.error:
+                pass
+            try:
+                beg_y, beg_x = self.window.getbegyx()
+                curses.setsyx(beg_y + y, beg_x + x)
+            except curses.error:
+                pass
         except curses.error:
             pass
 
