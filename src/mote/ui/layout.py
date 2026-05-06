@@ -1,4 +1,5 @@
 import curses
+import sys
 from mote import __version__
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
@@ -101,6 +102,15 @@ class ScreenLayout:
             focused_slice = self.bottom
         
         key = focused_slice.get_input()
+
+        # Windows often reports backspace as Ctrl+H (8). Handle it early so it
+        # reaches the editor/palette instead of command dispatch.
+        if sys.platform.startswith("win") and key == 8:
+            if self.input_focus == "middle":
+                self.editor.handle_key(key)
+            else:
+                self.palette.handle_key(key)
+            return (True, key)
         
         # Handle Ctrl+key combinations
         if self._is_ctrl_key(key):
