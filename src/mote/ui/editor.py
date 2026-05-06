@@ -1,3 +1,5 @@
+import curses
+
 from mote.core.buffer import Buffer
 
 
@@ -39,8 +41,9 @@ class Editor:
         else:
             self.line_num_width = 0
 
-        # Update buffer screen dimensions
-        self.buffer.resize_screen(height, width - self.line_num_width)
+        # Update buffer screen dimensions (clamp to at least 1)
+        text_width = max(1, width - self.line_num_width)
+        self.buffer.resize_screen(height, text_width)
         
         # Render each visible line
         for row in range(height):
@@ -51,7 +54,7 @@ class Editor:
             line = self.buffer.lines[line_idx]
             
             # Get visible portion of the line
-            visible_line = line[self.buffer.col_off:self.buffer.col_off + (width - self.line_num_width)]
+            visible_line = line[self.buffer.col_off:self.buffer.col_off + text_width]
             
             # Draw line number if enabled
             if self.show_line_numbers:
@@ -89,22 +92,22 @@ class Editor:
         Args:
             key: Key code from curses
         """
-        if key == ord('\n'):
+        if key == ord('\n') or key == curses.KEY_ENTER:
             self.buffer.split_line()
         elif key == ord('\t'):
             for _ in range(4):
                 self.buffer.insert_char(' ')
-        elif key in (ord('\b'), 8, 127, 263):  # Backspace
+        elif key in (curses.KEY_BACKSPACE, ord('\b'), 127):  # Backspace
             self.buffer.delete_char()
         elif 32 <= key <= 126:  # Printable ASCII
             self.buffer.insert_char(chr(key))
-        elif key == 259:  # Up arrow
+        elif key == curses.KEY_UP:
             self.buffer.move_up()
-        elif key == 258:  # Down arrow
+        elif key == curses.KEY_DOWN:
             self.buffer.move_down()
-        elif key == 260:  # Left arrow
+        elif key == curses.KEY_LEFT:
             self.buffer.move_left()
-        elif key == 261:  # Right arrow
+        elif key == curses.KEY_RIGHT:
             self.buffer.move_right()
 
     def set_line_numbers(self, enabled):

@@ -4,7 +4,7 @@ from mote import __version__
 from mote.core.command_handler import CommandHandler
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
-from mote.ui.pallette import Palette
+from mote.ui.palette import Palette
 
 
 class ScreenLayout:

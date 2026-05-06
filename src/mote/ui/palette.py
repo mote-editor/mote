@@ -1,3 +1,5 @@
+import curses
+
 from mote.core.buffer import Buffer
 
 
@@ -33,13 +35,13 @@ class Palette:
         self.slice.move_cursor(0, cursor_x)
 
     def handle_key(self, key):
-        if key == ord("\n"):
+        if key == ord("\n") or key == curses.KEY_ENTER:
             self.clear()
             return
         if key == 27:
             self.clear()
             return
-        if key in (ord("\b"), 8, 127, 263):
+        if key in (curses.KEY_BACKSPACE, ord("\b"), 127):
             self.buffer.delete_char()
             return
         if key == ord("\t"):

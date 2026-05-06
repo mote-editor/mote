@@ -26,7 +26,10 @@ class Screen:
                 curses.curs_set(1) # Show the cursor (0 = invisible, 1 = normal)
             except curses.error:
                 pass
-            self.styles = self._setup_colors(DEFAULT_THEME)
+            try:
+                self.styles = self._setup_colors(DEFAULT_THEME)
+            except curses.error:
+                self.styles = {}
 
         # Enable keypad decoding for arrow keys and function keys
         self.window.keypad(True)
