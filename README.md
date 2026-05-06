@@ -1,2 +1,2 @@
 # mote
-A tiny terminal text editor
+A tiny terminal text editor, similar to nano
