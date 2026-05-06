@@ -2,6 +2,7 @@ import curses
 import sys
 from mote import __version__
 from mote.core.command_handler import CommandHandler
+from mote.core.save import save_buffer
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
 from mote.ui.palette import Palette
@@ -40,7 +41,10 @@ class ScreenLayout:
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
-        self.command_handler = command_handler
+        if command_handler is None:
+            self.command_handler = CommandHandler(buffer=self.editor.buffer, save_func=save_buffer)
+        else:
+            self.command_handler = command_handler
 
     def get_top_slice(self):
         """Get the top slice (1 line)."""
@@ -193,7 +197,6 @@ if __name__ == "__main__":
         layout = ScreenLayout(
             window,
             show_line_numbers=True,
-            command_handler=CommandHandler(),
         )
         
         # Draw initial content
