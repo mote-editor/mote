@@ -2,6 +2,7 @@ import curses
 import sys
 from mote import __version__
 from mote.core.command_handler import CommandHandler
+from mote.core.save import save_buffer
 from mote.ui_lib.screen import Screen
 from mote.ui.editor import Editor
 from mote.ui.palette import Palette
@@ -37,10 +38,15 @@ class ScreenLayout:
         # Create editor for the middle slice
         self.editor = Editor(self.middle, buffer=buffer, show_line_numbers=show_line_numbers)
         self.palette = Palette(self.bottom)
+        self._default_palette_label = self.palette.label
+        self._pending_save_as = False
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
-        self.command_handler = command_handler
+        if command_handler is None:
+            self.command_handler = CommandHandler(buffer=self.editor.buffer, save_func=save_buffer)
+        else:
+            self.command_handler = command_handler
 
     def get_top_slice(self):
         """Get the top slice (1 line)."""
@@ -88,6 +94,49 @@ class ScreenLayout:
         # Ctrl+A = 1 -> 'a', Ctrl+B = 2 -> 'b', etc.
         return chr(ord('a') + key - 1)
 
+    def _buffer_needs_path(self):
+        buffer = self.editor.buffer
+        if getattr(buffer, "file_path", None):
+            return False
+        return buffer.name == "Untitled"
+
+    def _begin_save_as_prompt(self):
+        self._pending_save_as = True
+        self.input_focus = "bottom"
+        self.palette.label = "ENTER Save As "
+        self.palette.render(move_cursor=True)
+        self.bottom.refresh()
+        Screen.update_physical()
+
+    def _cancel_save_as_prompt(self):
+        self._pending_save_as = False
+        self.palette.label = self._default_palette_label
+        self.palette.clear()
+        self.input_focus = "middle"
+        self.editor.render(move_cursor=True)
+        self.middle.refresh()
+        Screen.update_physical()
+
+    def _complete_save_as_prompt(self, filename):
+        self._pending_save_as = False
+        self.palette.label = self._default_palette_label
+        self.palette.clear()
+        self.input_focus = "middle"
+
+        if filename:
+            self.editor.buffer.name = filename
+            save_buffer(self.editor.buffer)
+
+        self.editor.render(move_cursor=True)
+        self.middle.refresh()
+        Screen.update_physical()
+
+    def _handle_save_request(self):
+        if self._buffer_needs_path():
+            self._begin_save_as_prompt()
+            return
+        save_buffer(self.editor.buffer)
+
     def handle_input(self):
         """Handle input and focus switching.
         
@@ -118,6 +167,9 @@ class ScreenLayout:
             char = self._get_ctrl_char(key)
             if char == "q":
                 return (False, char)
+            if char == "s":
+                self._handle_save_request()
+                return (True, char)
             if self.command_handler:
                 should_continue = self.command_handler(char)
                 if should_continue is False:
@@ -126,6 +178,9 @@ class ScreenLayout:
         
         # Handle ESC - toggle input focus
         if key == 27:  # ESC key
+            if self._pending_save_as and self.input_focus == "bottom":
+                self._cancel_save_as_prompt()
+                return (True, None)
             if self.input_focus == "middle":
                 self.input_focus = "bottom"
                 self.bottom.draw(0, "", align="left", style="BAR", fill_line=True)
@@ -145,12 +200,19 @@ class ScreenLayout:
         # Handle ENTER in bottom slice - run command, clear, return to middle
         if key in (10, 13) and self.input_focus == "bottom":
             command_text = self.palette.get_command().strip()
+            if self._pending_save_as:
+                self._complete_save_as_prompt(command_text)
+                return (True, None)
+
             self.palette.clear()
             self.input_focus = "middle"
-            if command_text and self.command_handler:
-                should_continue = self.command_handler(command_text)
-                if should_continue is False:
-                    return (False, None)
+            if command_text:
+                if command_text.lower() in ("save", "write", "w", "s"):
+                    self._handle_save_request()
+                elif self.command_handler:
+                    should_continue = self.command_handler(command_text)
+                    if should_continue is False:
+                        return (False, None)
             return (True, None)
         
         # Pass input to editor if middle has focus (including Enter for newline)
@@ -193,7 +255,6 @@ if __name__ == "__main__":
         layout = ScreenLayout(
             window,
             show_line_numbers=True,
-            command_handler=CommandHandler(),
         )
         
         # Draw initial content
