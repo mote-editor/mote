@@ -40,6 +40,7 @@ class ScreenLayout:
         self.palette = Palette(self.bottom)
         self._default_palette_label = self.palette.label
         self._pending_save_as = False
+        self._clipboard = ""
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
@@ -169,6 +170,36 @@ class ScreenLayout:
                 return (False, char)
             if char == "s":
                 self._handle_save_request()
+                return (True, char)
+            if char == "c":
+                if self.input_focus == "middle":
+                    selected = self.editor.buffer.get_selection_text()
+                    if selected:
+                        self._clipboard = selected
+                else:
+                    selected = self.palette.buffer.get_selection_text()
+                    if selected:
+                        self._clipboard = selected
+                return (True, char)
+            if char == "x":
+                if self.input_focus == "middle":
+                    selected = self.editor.buffer.get_selection_text()
+                    if selected:
+                        self._clipboard = selected
+                        self.editor.buffer.delete_selection()
+                else:
+                    selected = self.palette.buffer.get_selection_text()
+                    if selected:
+                        self._clipboard = selected
+                        self.palette.buffer.delete_selection()
+                return (True, char)
+            if char == "v":
+                if self.input_focus == "middle":
+                    if self._clipboard:
+                        self.editor.buffer.insert_text(self._clipboard)
+                else:
+                    if self._clipboard:
+                        self.palette.buffer.insert_text(self._clipboard)
                 return (True, char)
             if self.command_handler:
                 should_continue = self.command_handler(char)

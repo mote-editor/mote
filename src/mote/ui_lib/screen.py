@@ -3,6 +3,7 @@ import curses
 DEFAULT_THEME = {
     "TEXT": (7, 0, -1),
     "BAR": (0, 0, curses.COLOR_RED),
+    "SELECTION": (0, 0, curses.COLOR_CYAN),
 }
 
 class Screen:
@@ -104,6 +105,8 @@ class Screen:
             return
         
         style_attr = self.styles.get(style, 0)
+        if style == "SELECTION" and style_attr == 0:
+            style_attr = curses.A_REVERSE
         try:
             # We slice the text to ensure it never exceeds the window width
             self.window.addstr(y, x, text[:w-x], style_attr)

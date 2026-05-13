@@ -129,6 +129,22 @@ class Buffer:
             start_y, start_x, end_y, end_x = end_y, end_x, start_y, start_x
         
         return (start_y, start_x, end_y, end_x)
+
+    # Get selected text as a single string
+    def get_selection_text(self):
+        bounds = self.get_selection_bounds()
+        if not bounds:
+            return ""
+
+        start_y, start_x, end_y, end_x = bounds
+        if start_y == end_y:
+            return self.lines[start_y][start_x:end_x]
+
+        parts = [self.lines[start_y][start_x:]]
+        if end_y - start_y > 1:
+            parts.extend(self.lines[start_y + 1:end_y])
+        parts.append(self.lines[end_y][:end_x])
+        return "\n".join(parts)
     
     # Delete text within selection bounds
     def delete_selection(self):
@@ -160,6 +176,39 @@ class Buffer:
         # Reset effective cursor to actual cursor position
         self._effective_cx = self.cx
         self.clear_selection()
+        self._check_scroll()
+
+    # Insert text at cursor, supporting multi-line paste
+    def insert_text(self, text):
+        if text == "":
+            return
+
+        if self.has_selection():
+            self.delete_selection()
+
+        self.dirty = True
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+        parts = normalized.split("\n")
+        line = self.get_line()
+
+        if len(parts) == 1:
+            self.lines[self.cy] = line[:self.cx] + parts[0] + line[self.cx:]
+            self.cx += len(parts[0])
+        else:
+            before = line[:self.cx] + parts[0]
+            after = parts[-1] + line[self.cx:]
+            self.lines[self.cy] = before
+
+            insert_at = self.cy + 1
+            for mid in parts[1:-1]:
+                self.lines.insert(insert_at, mid)
+                insert_at += 1
+
+            self.lines.insert(insert_at, after)
+            self.cy = insert_at
+            self.cx = len(parts[-1])
+
+        self._effective_cx = self.cx
         self._check_scroll()
     
     def _check_scroll(self):
