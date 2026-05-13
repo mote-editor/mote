@@ -41,6 +41,8 @@ class ScreenLayout:
         self._default_palette_label = self.palette.label
         self._pending_save_as = False
         self._clipboard = ""
+        self._status_message = None
+        self._status_pending_clear = False
         
         # Input state management
         self.input_focus = "middle"  # "middle" or "bottom"
@@ -138,6 +140,12 @@ class ScreenLayout:
             return
         save_buffer(self.editor.buffer)
 
+    def _set_status_message(self, message):
+        if self._pending_save_as:
+            return
+        self._status_message = message
+        self._status_pending_clear = False
+
     def handle_input(self):
         """Handle input and focus switching.
         
@@ -146,6 +154,10 @@ class ScreenLayout:
         ESC toggles focus between middle/bottom.
         Enter in bottom slice returns to middle.
         """
+        if self._status_pending_clear and not self._pending_save_as:
+            self._status_message = None
+            self._status_pending_clear = False
+
         # Get input from the currently focused slice
         if self.input_focus == "middle":
             focused_slice = self.middle
@@ -176,10 +188,16 @@ class ScreenLayout:
                     selected = self.editor.buffer.get_selection_text()
                     if selected:
                         self._clipboard = selected
+                        self._set_status_message("Copied")
+                    else:
+                        self._set_status_message("No selection")
                 else:
                     selected = self.palette.buffer.get_selection_text()
                     if selected:
                         self._clipboard = selected
+                        self._set_status_message("Copied")
+                    else:
+                        self._set_status_message("No selection")
                 return (True, char)
             if char == "x":
                 if self.input_focus == "middle":
@@ -187,19 +205,31 @@ class ScreenLayout:
                     if selected:
                         self._clipboard = selected
                         self.editor.buffer.delete_selection()
+                        self._set_status_message("Cut")
+                    else:
+                        self._set_status_message("No selection")
                 else:
                     selected = self.palette.buffer.get_selection_text()
                     if selected:
                         self._clipboard = selected
                         self.palette.buffer.delete_selection()
+                        self._set_status_message("Cut")
+                    else:
+                        self._set_status_message("No selection")
                 return (True, char)
             if char == "v":
                 if self.input_focus == "middle":
                     if self._clipboard:
                         self.editor.buffer.insert_text(self._clipboard)
+                        self._set_status_message("Pasted")
+                    else:
+                        self._set_status_message("Clipboard empty")
                 else:
                     if self._clipboard:
                         self.palette.buffer.insert_text(self._clipboard)
+                        self._set_status_message("Pasted")
+                    else:
+                        self._set_status_message("Clipboard empty")
                 return (True, char)
             if self.command_handler:
                 should_continue = self.command_handler(char)
@@ -251,6 +281,9 @@ class ScreenLayout:
             self.editor.handle_key(key)
         elif self.input_focus == "bottom":
             self.palette.handle_key(key)
+
+        if self._status_message is not None:
+            self._status_pending_clear = True
         
         # Other keys are handled by the application layer
         return (True, key)
@@ -269,6 +302,8 @@ class ScreenLayout:
         self.top.draw(0, f"v{__version__} ", align="right", style="BAR", fill_line=False)
         self.editor.render(move_cursor=False)
         self.bottom.draw(0, "", align="left", style="BAR", fill_line=True)
+        if not self._pending_save_as:
+            self.palette.label = self._status_message or self._default_palette_label
         self.palette.render(move_cursor=False)
         if self.input_focus == "bottom":
             self.palette.move_cursor()
